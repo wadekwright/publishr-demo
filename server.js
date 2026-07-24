@@ -34,7 +34,7 @@ async function getTablelandArticles(articleIds) {
 }
 
 // -------------------------------------------------------------
-// 1. PDF Generation Route (Finalized Copy & Layout)
+// 1. PDF Generation Route (Updated QR Code Text Block)
 // -------------------------------------------------------------
 app.get('/api/generate-pdf', async (req, res) => {
   try {
@@ -66,10 +66,7 @@ app.get('/api/generate-pdf', async (req, res) => {
 
     // Header
     doc.fillColor('#1a365d').fontSize(22).font('Helvetica-Bold').text('Publishr', margin, margin);
-    
-    // Updated Header Subtitle
     doc.fillColor('#4a5568').fontSize(8.5).font('Helvetica').text('Decentralized publishing, measurement, and monetization | publishr-demo.onrender.com', margin, margin + 26);
-    
     doc.moveTo(margin, margin + 40).lineTo(pageWidth - margin, margin + 40).strokeColor('#cbd5e0').lineWidth(1).stroke();
 
     // 2-Column Layout Setup
@@ -87,7 +84,7 @@ app.get('/api/generate-pdf', async (req, res) => {
       // Column Divider Line
       if (i === 1) {
         const lineX = colX - (gutter / 2);
-        doc.moveTo(lineX, colY).lineTo(lineX, qrRowY + 65).strokeColor('#e2e8f0').lineWidth(0.5).stroke();
+        doc.moveTo(lineX, colY).lineTo(lineX, qrRowY + 68).strokeColor('#e2e8f0').lineWidth(0.5).stroke();
       }
 
       // Source Platform Header Tag
@@ -114,21 +111,39 @@ app.get('/api/generate-pdf', async (req, res) => {
 
       // Generate QR Code
       const verifyUrl = `${baseUrl}/verify?id=${art.article_id}`;
-      const qrDataUrl = await QRCode.toDataURL(verifyUrl, { margin: 1, width: 80 });
+      const qrDataUrl = await QRCode.toDataURL(verifyUrl, { margin: 1, width: 90 });
       const qrBuffer = Buffer.from(qrDataUrl.split(',')[1], 'base64');
 
-      // QR Image & Details
-      doc.image(qrBuffer, colX, qrRowY, { width: 50, height: 50 });
+      // Render QR Code Image
+      doc.image(qrBuffer, colX, qrRowY, { width: 58, height: 58 });
 
-      const textX = colX + 58;
-      const textWidth = colWidth - 58;
+      const textX = colX + 64;
+      const textWidth = colWidth - 64;
 
-      doc.fillColor('#1a365d').fontSize(8).font('Helvetica-Bold').text('SCAN TO VERIFY & SETTLE', textX, qrRowY + 2);
-      doc.fillColor('#718096').fontSize(7).font('Helvetica').text('Triggers 3-tier micropayment & links to publisher.', textX, qrRowY + 14, { width: textWidth });
-      doc.fillColor('#2b6cb0').fontSize(7).font('Helvetica-Bold').text(`Ledger ID: #11155111_${art.article_id}`, textX, qrRowY + 34);
+      // QR Block Header Text
+      doc.fillColor('#1a365d').fontSize(7.5).font('Helvetica-Bold').text('SCAN THE QR CODE TO:', textX, qrRowY + 1);
+
+      // Bullet Point 1
+      doc.fillColor('#2d3748').fontSize(6.5).font('Helvetica-Bold').text('- Verify ', textX, qrRowY + 11, { continued: true })
+         .font('Helvetica').text('article authenticity on the blockchain', { width: textWidth });
+
+      // Bullet Point 2
+      doc.fillColor('#2d3748').fontSize(6.5).font('Helvetica-Bold').text('- Action ', textX, qrRowY + 20, { continued: true })
+         .font('Helvetica').text('micropayments to source, author, Publishr', { width: textWidth });
+
+      // Bullet Point 3
+      doc.fillColor('#2d3748').fontSize(6.5).font('Helvetica-Bold').text('- Measure ', textX, qrRowY + 29, { continued: true })
+         .font('Helvetica').text('reader traffic and interest from print', { width: textWidth });
+
+      // Bullet Point 4
+      doc.fillColor('#2d3748').fontSize(6.5).font('Helvetica-Bold').text('- Read ', textX, qrRowY + 38, { continued: true })
+         .font('Helvetica').text('the full article on the source platform', { width: textWidth });
+
+      // Ledger ID
+      doc.fillColor('#2b6cb0').fontSize(6.5).font('Helvetica-Bold').text(`Ledger ID: ${TABLE_NAME} | Row: ${art.article_id}`, textX, qrRowY + 49);
     }
 
-    // Updated Footer
+    // Page Footer
     const footerY = pageHeight - margin - 15;
     doc.moveTo(margin, footerY - 5).lineTo(pageWidth - margin, footerY - 5).strokeColor('#cbd5e0').lineWidth(0.5).stroke();
     doc.fillColor('#718096').fontSize(8.5).font('Helvetica').text('Wade K Wright | www.linkedin.com/in/wadekw', margin, footerY, { align: 'center' });
