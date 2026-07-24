@@ -34,7 +34,7 @@ async function getTablelandArticles(articleIds) {
 }
 
 // -------------------------------------------------------------
-// 1. PDF Generation Route (2-Column Layout)
+// 1. PDF Generation Route (Matching pdf-preferred-layout-01.png)
 // -------------------------------------------------------------
 app.get('/api/generate-pdf', async (req, res) => {
   try {
@@ -69,63 +69,62 @@ app.get('/api/generate-pdf', async (req, res) => {
     doc.fillColor('#4a5568').fontSize(9).font('Helvetica').text('Decentralized Content Notary & Ledger Verification Digest', margin, margin + 26);
     doc.moveTo(margin, margin + 40).lineTo(pageWidth - margin, margin + 40).strokeColor('#cbd5e0').lineWidth(1).stroke();
 
-    // 2-Column Layout Dimensions
+    // 2-Column Layout Setup
     const gutter = 18;
     const colWidth = (contentWidth - gutter) / 2;
     const colY = margin + 50;
-    const colHeight = pageHeight - margin - colY - 20;
 
     for (let i = 0; i < articles.length; i++) {
       const art = articles[i];
       const colX = margin + (i * (colWidth + gutter));
 
-      // Optional column separator line between Column 1 and Column 2
+      // Column Divider Line
       if (i === 1) {
         const lineX = colX - (gutter / 2);
-        doc.moveTo(lineX, colY).lineTo(lineX, colY + colHeight).strokeColor('#e2e8f0').lineWidth(0.75).stroke();
+        doc.moveTo(lineX, colY).lineTo(lineX, pageHeight - margin - 20).strokeColor('#e2e8f0').lineWidth(0.5).stroke();
       }
 
       // Source Platform Header Tag
       doc.fillColor('#2b6cb0').fontSize(9).font('Helvetica-Bold').text(art.source_platform.toUpperCase(), colX, colY);
       
       // Title
-      doc.fillColor('#2d3748').fontSize(13).font('Helvetica-Bold').text(art.title, colX, colY + 14, { width: colWidth, height: 45, ellipsis: true });
+      doc.fillColor('#2d3748').fontSize(13).font('Helvetica-Bold').text(art.title, colX, colY + 14, { width: colWidth, height: 42, ellipsis: true });
       
-      // Author & Ledger Meta
-      doc.fillColor('#718096').fontSize(8).font('Helvetica').text(`By ${art.author} | Row #${art.article_id}`, colX, colY + 62);
+      // Author & Ledger Row
+      doc.fillColor('#718096').fontSize(8).font('Helvetica').text(`By ${art.author} | Row #${art.article_id}`, colX, colY + 58);
       
       // Body Text
       const cleanBody = stripHTML(art.body_text);
-      doc.fillColor('#2d3748').fontSize(9).font('Helvetica').text(cleanBody, colX, colY + 76, {
+      doc.fillColor('#2d3748').fontSize(9).font('Helvetica').text(cleanBody, colX, colY + 72, {
         width: colWidth,
-        height: colHeight - 170, // Leaves exact room for QR block below
+        height: 220, // Compact height matching layout-01 screenshot
         align: 'justify',
-        lineGap: 2,
+        lineGap: 2.5,
         ellipsis: true
       });
 
-      // Integrated QR Code Box at Bottom of Column
+      // Horizontal Divider Line right below the article text
+      const qrBoxY = colY + 300;
+      doc.moveTo(colX, qrBoxY).lineTo(colX + colWidth, qrBoxY).strokeColor('#edf2f7').lineWidth(1).stroke();
+
+      // Generate QR Code
       const verifyUrl = `${baseUrl}/verify?id=${art.article_id}`;
       const qrDataUrl = await QRCode.toDataURL(verifyUrl, { margin: 1, width: 80 });
       const qrBuffer = Buffer.from(qrDataUrl.split(',')[1], 'base64');
 
-      const qrY = colY + colHeight - 85;
-      
-      // Top line for QR block
-      doc.moveTo(colX, qrY - 6).lineTo(colX + colWidth, qrY - 6).strokeColor('#edf2f7').lineWidth(1).stroke();
+      // Docked QR Code & Details (Placed directly under divider line)
+      const qrImgY = qrBoxY + 8;
+      doc.image(qrBuffer, colX, qrImgY, { width: 50, height: 50 });
 
-      doc.image(qrBuffer, colX, qrY, { width: 60, height: 60 });
+      const textX = colX + 58;
+      const textWidth = colWidth - 58;
 
-      // QR Text details aligned strictly inside column width
-      const textX = colX + 66;
-      const textWidth = colWidth - 66;
-
-      doc.fillColor('#1a365d').fontSize(8).font('Helvetica-Bold').text('SCAN TO VERIFY & SETTLE', textX, qrY + 4);
-      doc.fillColor('#718096').fontSize(7).font('Helvetica').text('Triggers 3-tier micropayment & links to publisher.', textX, qrY + 16, { width: textWidth });
-      doc.fillColor('#2b6cb0').fontSize(7).font('Helvetica-Bold').text(`Ledger ID: #11155111_${art.article_id}`, textX, qrY + 42);
+      doc.fillColor('#1a365d').fontSize(8).font('Helvetica-Bold').text('SCAN TO VERIFY & SETTLE', textX, qrImgY + 2);
+      doc.fillColor('#718096').fontSize(7).font('Helvetica').text('Triggers 3-tier micropayment & links to publisher.', textX, qrImgY + 14, { width: textWidth });
+      doc.fillColor('#2b6cb0').fontSize(7).font('Helvetica-Bold').text(`Ledger ID: #11155111_${art.article_id}`, textX, qrImgY + 34);
     }
 
-    // Footer
+    // Page Footer
     const footerY = pageHeight - margin - 15;
     doc.moveTo(margin, footerY - 5).lineTo(pageWidth - margin, footerY - 5).strokeColor('#cbd5e0').lineWidth(0.5).stroke();
     doc.fillColor('#a0aec0').fontSize(8).font('Helvetica').text('Generated via Publishr Protocol | On-Chain Verification Powered by Sepolia Tableland', margin, footerY, { align: 'center' });
