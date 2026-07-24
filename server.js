@@ -13,10 +13,16 @@ const TABLE_NAME = "news_notary_11155111_2087";
 
 app.use(express.static(__dirname));
 
-// Helper: Strip HTML tags for PDF rendering
+// Helper: Strip HTML tags and preserve proper sentence spacing
 function stripHTML(html) {
   if (!html) return '';
-  return html.replace(/<[^>]*>?/gm, '').replace(/&nbsp;/g, ' ').trim();
+  return html
+    .replace(/<\/p>/gi, ' ')
+    .replace(/<br\s*\/?>/gi, ' ')
+    .replace(/<[^>]*>?/gm, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 // Helper: Fetch article rows from Tableland
@@ -43,18 +49,16 @@ app.get('/api/generate-pdf', async (req, res) => {
       return res.status(404).send("Articles not found on Tableland ledger.");
     }
 
-    // Determine host protocol/domain for QR code redirection
     const hostDomain = req.get('host');
     const protocol = req.protocol === 'https' || req.get('x-forwarded-proto') === 'https' ? 'https' : 'http';
     const baseUrl = `${protocol}://${hostDomain}`;
 
-    const doc = new PDFDocument({ size: 'A4', margin: 36 }); // 36pt = 0.5in margins
+    const doc = new PDFDocument({ size: 'A4', margin: 36 });
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', 'inline; filename="publishr-notary-digest.pdf"');
     doc.pipe(res);
 
-    // Document Dimensions (A4: 595.28 x 841.89 pt)
     const pageWidth = 595.28;
     const pageHeight = 841.89;
     const margin = 36;
@@ -65,49 +69,57 @@ app.get('/api/generate-pdf', async (req, res) => {
     doc.fillColor('#4a5568').fontSize(9).font('Helvetica').text('Decentralized Content Notary & Ledger Verification Digest', margin, margin + 26);
     doc.moveTo(margin, margin + 40).lineTo(pageWidth - margin, margin + 40).strokeColor('#cbd5e0').lineWidth(1).stroke();
 
-    // Two Column Layout Dimensions
-    const colWidth = (contentWidth - 20) / 2; // 20pt gutter
-    const colY = margin + 50;
+    // Stacked Card Dimensions
+    const cardHeight = 345;
+    const cardGap = 20;
 
     for (let i = 0; i < articles.length; i++) {
       const art = articles[i];
-      const colX = margin + (i * (colWidth + 20));
+      const cardY = margin + 50 + (i * (cardHeight + cardGap));
+
+      // Light Card Background & Border
+      doc.rect(margin, cardY, contentWidth, cardHeight).fillAndStroke('#f8fafc', '#e2e8f0');
+
+      // Padding inside card
+      const padX = margin + 15;
+      const padWidth = contentWidth - 30;
 
       // Source Platform Header Tag
-      doc.fillColor('#2b6cb0').fontSize(9).font('Helvetica-Bold').text(art.source_platform.toUpperCase(), colX, colY);
+      doc.fillColor('#2b6cb0').fontSize(9).font('Helvetica-Bold').text(art.source_platform.toUpperCase(), padX, cardY + 15);
       
       // Title
-      doc.fillColor('#2d3748').fontSize(14).font('Helvetica-Bold').text(art.title, colX, colY + 14, { width: colWidth, height: 45, ellipsis: true });
+      doc.fillColor('#2d3748').fontSize(14).font('Helvetica-Bold').text(art.title, padX, cardY + 28, { width: padWidth, height: 36, ellipsis: true });
       
       // Author & Ledger Meta
-      doc.fillColor('#718096').fontSize(8).font('Helvetica').text(`By ${art.author} | Tableland Row #${art.article_id}`, colX, colY + 62);
+      doc.fillColor('#718096').fontSize(8).font('Helvetica').text(`By ${art.author}  |  Tableland Ledger Row #${art.article_id}`, padX, cardY + 68);
       
       // Clean Body Text
       const cleanBody = stripHTML(art.body_text);
-      doc.fillColor('#2d3748').fontSize(9).font('Helvetica').text(cleanBody, colX, colY + 76, {
-        width: colWidth,
-        height: 520,
-        align: 'justify',
+      doc.fillColor('#2d3748').fontSize(9.5).font('Helvetica').text(cleanBody, padX, cardY + 84, {
+        width: padWidth,
+        height: 160,
+        align: 'left',
+        lineGap: 2.5,
         ellipsis: true
       });
 
-      // QR Code Generation for Verification Interstitial Gate
+      // QR Code Box - Integrated Directly Inside Bottom Right of Card
       const verifyUrl = `${baseUrl}/verify?id=${art.article_id}`;
       const qrDataUrl = await QRCode.toDataURL(verifyUrl, { margin: 1, width: 90 });
       const qrBuffer = Buffer.from(qrDataUrl.split(',')[1], 'base64');
 
-      const qrY = pageHeight - margin - 110;
-      doc.image(qrBuffer, colX, qrY, { width: 80, height: 80 });
+      const qrY = cardY + cardHeight - 80;
+      doc.image(qrBuffer, padX, qrY, { width: 65, height: 65 });
 
-      // QR Caption & Instructions
-      doc.fillColor('#1a365d').fontSize(8).font('Helvetica-Bold').text('SCAN TO VERIFY & SETTLE', colX + 88, qrY + 10);
-      doc.fillColor('#718096').fontSize(7).font('Helvetica').text('Scans trigger 3-tier micropayment settlement & link to source platform.', colX + 88, qrY + 24, { width: colWidth - 88 });
-      doc.fillColor('#2b6cb0').fontSize(7).font('Helvetica-Bold').text(`Ledger ID: #11155111_${art.article_id}`, colX + 88, qrY + 55);
+      // QR Text
+      doc.fillColor('#1a365d').fontSize(8.5).font('Helvetica-Bold').text('SCAN TO VERIFY & SETTLE', padX + 75, qrY + 8);
+      doc.fillColor('#718096').fontSize(7.5).font('Helvetica').text('Triggers 3-tier micropayment settlement (Source / Author / Publishr) & links to original publisher.', padX + 75, qrY + 22, { width: padWidth - 75 });
+      doc.fillColor('#2b6cb0').fontSize(7.5).font('Helvetica-Bold').text(`Ledger ID: #11155111_${art.article_id}`, padX + 75, qrY + 48);
     }
 
     // Footer
     const footerY = pageHeight - margin - 15;
-    doc.moveTo(margin, footerY - 5).lineTo(pageWidth - margin, footerY - 5).strokeColor('#e2e8f0').lineWidth(0.5).stroke();
+    doc.moveTo(margin, footerY - 5).lineTo(pageWidth - margin, footerY - 5).strokeColor('#cbd5e0').lineWidth(0.5).stroke();
     doc.fillColor('#a0aec0').fontSize(8).font('Helvetica').text('Generated via Publishr Protocol | On-Chain Verification Powered by Sepolia Tableland', margin, footerY, { align: 'center' });
 
     doc.end();
@@ -130,7 +142,6 @@ app.get('/verify', async (req, res) => {
 
     const art = articles[0];
 
-    // Responsive Mobile HTML Page for Verification Interstitial
     const html = `
     <!DOCTYPE html>
     <html lang="en">
@@ -192,7 +203,6 @@ app.get('/verify', async (req, res) => {
   }
 });
 
-// Start Server
 app.listen(PORT, () => {
   console.log(`Publishr server listening on port ${PORT}`);
 });
