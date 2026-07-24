@@ -34,7 +34,7 @@ async function getTablelandArticles(articleIds) {
 }
 
 // -------------------------------------------------------------
-// 1. PDF Generation Route (Tightened Vertical Alignment)
+// 1. PDF Generation Route (Finalized Copy & Layout)
 // -------------------------------------------------------------
 app.get('/api/generate-pdf', async (req, res) => {
   try {
@@ -66,7 +66,10 @@ app.get('/api/generate-pdf', async (req, res) => {
 
     // Header
     doc.fillColor('#1a365d').fontSize(22).font('Helvetica-Bold').text('Publishr', margin, margin);
-    doc.fillColor('#4a5568').fontSize(9).font('Helvetica').text('Decentralized Content Notary & Ledger Verification Digest', margin, margin + 26);
+    
+    // Updated Header Subtitle
+    doc.fillColor('#4a5568').fontSize(8.5).font('Helvetica').text('Decentralized publishing, measurement, and monetization | publishr-demo.onrender.com', margin, margin + 26);
+    
     doc.moveTo(margin, margin + 40).lineTo(pageWidth - margin, margin + 40).strokeColor('#cbd5e0').lineWidth(1).stroke();
 
     // 2-Column Layout Setup
@@ -74,7 +77,7 @@ app.get('/api/generate-pdf', async (req, res) => {
     const colWidth = (contentWidth - gutter) / 2;
     const colY = margin + 50;
 
-    // Fixed Baseline for QR Row - Moved up significantly to eliminate vertical gap
+    // Fixed Baseline for QR Row
     const qrRowY = colY + 195;
 
     for (let i = 0; i < articles.length; i++) {
@@ -96,7 +99,7 @@ app.get('/api/generate-pdf', async (req, res) => {
       // Author & Ledger Row
       doc.fillColor('#718096').fontSize(8).font('Helvetica').text(`By ${art.author} | Row #${art.article_id}`, colX, colY + 58);
       
-      // Body Text (Height capped right at the top of the QR divider)
+      // Body Text
       const cleanBody = stripHTML(art.body_text);
       doc.fillColor('#2d3748').fontSize(9).font('Helvetica').text(cleanBody, colX, colY + 72, {
         width: colWidth,
@@ -114,7 +117,7 @@ app.get('/api/generate-pdf', async (req, res) => {
       const qrDataUrl = await QRCode.toDataURL(verifyUrl, { margin: 1, width: 80 });
       const qrBuffer = Buffer.from(qrDataUrl.split(',')[1], 'base64');
 
-      // QR Image & Text (Synchronized on exact same horizontal axis across both columns)
+      // QR Image & Details
       doc.image(qrBuffer, colX, qrRowY, { width: 50, height: 50 });
 
       const textX = colX + 58;
@@ -125,10 +128,10 @@ app.get('/api/generate-pdf', async (req, res) => {
       doc.fillColor('#2b6cb0').fontSize(7).font('Helvetica-Bold').text(`Ledger ID: #11155111_${art.article_id}`, textX, qrRowY + 34);
     }
 
-    // Page Footer
+    // Updated Footer
     const footerY = pageHeight - margin - 15;
     doc.moveTo(margin, footerY - 5).lineTo(pageWidth - margin, footerY - 5).strokeColor('#cbd5e0').lineWidth(0.5).stroke();
-    doc.fillColor('#a0aec0').fontSize(8).font('Helvetica').text('Generated via Publishr Protocol | On-Chain Verification Powered by Sepolia Tableland', margin, footerY, { align: 'center' });
+    doc.fillColor('#718096').fontSize(8.5).font('Helvetica').text('Wade K Wright | www.linkedin.com/in/wadekw', margin, footerY, { align: 'center' });
 
     doc.end();
   } catch (err) {
