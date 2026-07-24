@@ -8,7 +8,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Tableland & Sepolia Config
-const TABLELAND_ENDPOINT = "https://tableland.network/api/v1/single_query?chain=11155111&s=";
+const TABLELAND_ENDPOINT = "https://testnets.tableland.network/api/v1/query?statement=";
 const TABLE_NAME = "news_notary_11155111_2087";
 
 app.use(express.static(__dirname));
