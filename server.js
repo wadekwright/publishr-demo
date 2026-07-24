@@ -34,7 +34,7 @@ async function getTablelandArticles(articleIds) {
 }
 
 // -------------------------------------------------------------
-// 1. PDF Generation Route
+// 1. PDF Generation Route (2-Column Layout)
 // -------------------------------------------------------------
 app.get('/api/generate-pdf', async (req, res) => {
   try {
@@ -69,52 +69,60 @@ app.get('/api/generate-pdf', async (req, res) => {
     doc.fillColor('#4a5568').fontSize(9).font('Helvetica').text('Decentralized Content Notary & Ledger Verification Digest', margin, margin + 26);
     doc.moveTo(margin, margin + 40).lineTo(pageWidth - margin, margin + 40).strokeColor('#cbd5e0').lineWidth(1).stroke();
 
-    // Stacked Card Dimensions
-    const cardHeight = 345;
-    const cardGap = 20;
+    // 2-Column Layout Dimensions
+    const gutter = 18;
+    const colWidth = (contentWidth - gutter) / 2;
+    const colY = margin + 50;
+    const colHeight = pageHeight - margin - colY - 20;
 
     for (let i = 0; i < articles.length; i++) {
       const art = articles[i];
-      const cardY = margin + 50 + (i * (cardHeight + cardGap));
+      const colX = margin + (i * (colWidth + gutter));
 
-      // Light Card Background & Border
-      doc.rect(margin, cardY, contentWidth, cardHeight).fillAndStroke('#f8fafc', '#e2e8f0');
-
-      // Padding inside card
-      const padX = margin + 15;
-      const padWidth = contentWidth - 30;
+      // Optional column separator line between Column 1 and Column 2
+      if (i === 1) {
+        const lineX = colX - (gutter / 2);
+        doc.moveTo(lineX, colY).lineTo(lineX, colY + colHeight).strokeColor('#e2e8f0').lineWidth(0.75).stroke();
+      }
 
       // Source Platform Header Tag
-      doc.fillColor('#2b6cb0').fontSize(9).font('Helvetica-Bold').text(art.source_platform.toUpperCase(), padX, cardY + 15);
+      doc.fillColor('#2b6cb0').fontSize(9).font('Helvetica-Bold').text(art.source_platform.toUpperCase(), colX, colY);
       
       // Title
-      doc.fillColor('#2d3748').fontSize(14).font('Helvetica-Bold').text(art.title, padX, cardY + 28, { width: padWidth, height: 36, ellipsis: true });
+      doc.fillColor('#2d3748').fontSize(13).font('Helvetica-Bold').text(art.title, colX, colY + 14, { width: colWidth, height: 45, ellipsis: true });
       
       // Author & Ledger Meta
-      doc.fillColor('#718096').fontSize(8).font('Helvetica').text(`By ${art.author}  |  Tableland Ledger Row #${art.article_id}`, padX, cardY + 68);
+      doc.fillColor('#718096').fontSize(8).font('Helvetica').text(`By ${art.author} | Row #${art.article_id}`, colX, colY + 62);
       
-      // Clean Body Text
+      // Body Text
       const cleanBody = stripHTML(art.body_text);
-      doc.fillColor('#2d3748').fontSize(9.5).font('Helvetica').text(cleanBody, padX, cardY + 84, {
-        width: padWidth,
-        height: 160,
-        align: 'left',
-        lineGap: 2.5,
+      doc.fillColor('#2d3748').fontSize(9).font('Helvetica').text(cleanBody, colX, colY + 76, {
+        width: colWidth,
+        height: colHeight - 170, // Leaves exact room for QR block below
+        align: 'justify',
+        lineGap: 2,
         ellipsis: true
       });
 
-      // QR Code Box - Integrated Directly Inside Bottom Right of Card
+      // Integrated QR Code Box at Bottom of Column
       const verifyUrl = `${baseUrl}/verify?id=${art.article_id}`;
-      const qrDataUrl = await QRCode.toDataURL(verifyUrl, { margin: 1, width: 90 });
+      const qrDataUrl = await QRCode.toDataURL(verifyUrl, { margin: 1, width: 80 });
       const qrBuffer = Buffer.from(qrDataUrl.split(',')[1], 'base64');
 
-      const qrY = cardY + cardHeight - 80;
-      doc.image(qrBuffer, padX, qrY, { width: 65, height: 65 });
+      const qrY = colY + colHeight - 85;
+      
+      // Top line for QR block
+      doc.moveTo(colX, qrY - 6).lineTo(colX + colWidth, qrY - 6).strokeColor('#edf2f7').lineWidth(1).stroke();
 
-      // QR Text
-      doc.fillColor('#1a365d').fontSize(8.5).font('Helvetica-Bold').text('SCAN TO VERIFY & SETTLE', padX + 75, qrY + 8);
-      doc.fillColor('#718096').fontSize(7.5).font('Helvetica').text('Triggers 3-tier micropayment settlement (Source / Author / Publishr) & links to original publisher.', padX + 75, qrY + 22, { width: padWidth - 75 });
-      doc.fillColor('#2b6cb0').fontSize(7.5).font('Helvetica-Bold').text(`Ledger ID: #11155111_${art.article_id}`, padX + 75, qrY + 48);
+      doc.image(qrBuffer, colX, qrY, { width: 60, height: 60 });
+
+      // QR Text details aligned strictly inside column width
+      const textX = colX + 66;
+      const textWidth = colWidth - 66;
+
+      doc.fillColor('#1a365d').fontSize(8).font('Helvetica-Bold').text('SCAN TO VERIFY & SETTLE', textX, qrY + 4);
+      doc.fillColor('#718096').fontSize(7).font('Helvetica').text('Triggers 3-tier micropayment & links to publisher.', textX, qrY + 16, { width: textWidth });
+      doc.fillColor('#2b6cb0').fontSize(7).font('Helvetica-Bold').text(`Ledger ID: #11155111_${art.article_id}`, textX, qrY + 42);
     }
 
     // Footer
