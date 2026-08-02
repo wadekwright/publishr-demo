@@ -78,13 +78,13 @@ async function executeMicropaymentSplit(art) {
 
     console.log(`Executing 3-Tier Micropayment for Article #${art.article_id}...`);
 
-    // Batch 1: Main settlement transfer to Source Platform
+    // Broadcast primary settlement transaction to get immediate tx hash
     const tx = await walletSigner.sendTransaction({
       to: platformAddr,
       value: platformAmt
     });
 
-    // Fire remaining royalties asynchronously so user page load stays fast
+    // Fire secondary transfers asynchronously so user page load stays fast
     walletSigner.sendTransaction({ to: authorAddr, value: authorAmt }).catch(e => console.error("Author transfer err:", e.message));
     walletSigner.sendTransaction({ to: feeAddr, value: feeAmt }).catch(e => console.error("Fee transfer err:", e.message));
 
@@ -309,7 +309,7 @@ app.get('/verify', async (req, res) => {
 
           ${txHash ? `
           <div class="tx-proof">
-            <strong>✓ Live Sepolia Settlement Executed!</strong><br/>
+            <strong>✓ Live Sepolia Settlement Broadcasted!</strong><br/>
             Tx Hash: <span style="font-family:monospace; font-size:0.7rem;">${txHash.substring(0, 18)}...</span><br/>
             <a href="https://sepolia.etherscan.io/tx/${txHash}" target="_blank" class="tx-link">View Transaction on Sepolia Etherscan ↗</a>
           </div>
