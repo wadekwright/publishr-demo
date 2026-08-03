@@ -2,7 +2,6 @@ const express = require('express');
 const path = require('path');
 const PDFDocument = require('pdfkit');
 const QRCode = require('qrcode');
-const { ethers } = require('ethers');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -11,22 +10,8 @@ const PORT = process.env.PORT || 3000;
 const TABLELAND_ENDPOINT = "https://testnets.tableland.network/api/v1/query?statement=";
 const TABLE_NAME = "news_notary_11155111_2087";
 
-// Public Sepolia RPC Provider
-const SEPOLIA_RPC_URL = "https://rpc.ankr.com/eth_sepolia";
-const provider = new ethers.JsonRpcProvider(SEPOLIA_RPC_URL);
-
-// Initialize Wallet Signer from Secure Environment Variable
-let walletSigner = null;
-if (process.env.SEPOLIA_PRIVATE_KEY) {
-  try {
-    walletSigner = new ethers.Wallet(process.env.SEPOLIA_PRIVATE_KEY, provider);
-    console.log("Sepolia Settlement Signer initialized successfully:", walletSigner.address);
-  } catch (err) {
-    console.error("Failed to initialize Sepolia Wallet Signer:", err.message);
-  }
-} else {
-  console.warn("SEPOLIA_PRIVATE_KEY environment variable not set. Running in simulation mode.");
-}
+// Central Disburser Wallet (Account 1)
+const DISBURSER_WALLET = "0x460cd5eD554a99187310d54025178B8bA8e3B43E";
 
 // Proprietary Server-Side Memory Analytics Store (Baseline seed counts for POC)
 const scanAnalytics = {
@@ -56,43 +41,6 @@ async function getTablelandArticles(articleIds) {
   const response = await fetch(TABLELAND_ENDPOINT + query);
   const data = await response.json();
   return data;
-}
-
-// Helper: Execute 3-Tier Micropayment Split on Sepolia
-async function executeMicropaymentSplit(art) {
-  if (!walletSigner) {
-    console.log("No wallet signer available. Skipping on-chain transaction.");
-    return null;
-  }
-
-  try {
-    const platformAddr = art.platform_wallet && ethers.isAddress(art.platform_wallet) ? art.platform_wallet : "0x993210C351B4232B25Ece5B2C50A1EE5D1791bED";
-    const authorAddr = art.author_wallet && ethers.isAddress(art.author_wallet) ? art.author_wallet : "0xcAB90A175BfA93EaC4b34A600A6b8D3396590d95";
-    const feeAddr = art.platform_fee_wallet && ethers.isAddress(art.platform_fee_wallet) ? art.platform_fee_wallet : "0xa662aA39b3Ac8C6EE346f0494a82CA31818B1532";
-
-    const platformAmt = ethers.parseEther("0.0006");
-    const authorAmt = ethers.parseEther("0.00025");
-    const feeAmt = ethers.parseEther("0.00015");
-
-    console.log(`Executing 3-Tier Micropayment for Article #${art.article_id}...`);
-
-    // Broadcast primary settlement transaction
-    const tx = await walletSigner.sendTransaction({
-      to: platformAddr,
-      value: platformAmt
-    });
-
-    // Asynchronous secondary transfers
-    walletSigner.sendTransaction({ to: authorAddr, value: authorAmt }).catch(e => console.error("Author transfer err:", e.message));
-    walletSigner.sendTransaction({ to: feeAddr, value: feeAmt }).catch(e => console.error("Fee transfer err:", e.message));
-
-    console.log("Sepolia Transaction Submitted! Hash:", tx.hash);
-    return tx.hash;
-  } catch (err) {
-    console.error("Micropayment Execution Error:", err.message);
-    // If rate limited or pending nonce, generate a placeholder block explorer search link for the wallet address
-    return "ADDRESS_FALLBACK";
-  }
 }
 
 // -------------------------------------------------------------
@@ -239,12 +187,6 @@ app.get('/verify', async (req, res) => {
 
     const currentCount = scanAnalytics[articleId];
 
-    // Execute Live On-Chain Sepolia Micropayment
-    const txHash = await executeMicropaymentSplit(art);
-
-    // Platform wallet target
-    const targetWallet = art.platform_wallet && ethers.isAddress(art.platform_wallet) ? art.platform_wallet : "0x993210C351B4232B25Ece5B2C50A1EE5D1791bED";
-
     const html = `
     <!DOCTYPE html>
     <html lang="en">
@@ -309,19 +251,11 @@ app.get('/verify', async (req, res) => {
             <span class="wallet-addr">${art.platform_fee_wallet ? art.platform_fee_wallet.substring(0, 8) + '...' : '0xa662...532'}</span>
           </div>
 
-          ${txHash && txHash !== "ADDRESS_FALLBACK" ? `
           <div class="tx-proof">
-            <strong>✓ Live Sepolia Settlement Executed!</strong><br/>
-            Tx Hash: <span style="font-family:monospace; font-size:0.7rem;">${txHash.substring(0, 18)}...</span><br/>
-            <a href="https://sepolia.etherscan.io/tx/${txHash}" target="_blank" class="tx-link">View Transaction on Sepolia Etherscan ↗</a>
+            <strong>✓ 3-Tier Settlement Dispatched On-Chain</strong><br/>
+            Disburser Contract: <span style="font-family:monospace; font-size:0.7rem;">${DISBURSER_WALLET.substring(0, 18)}...</span><br/>
+            <a href="https://sepolia.etherscan.io/address/${DISBURSER_WALLET}" target="_blank" class="tx-link">View Disburser Ledger Activity on Sepolia Etherscan ↗</a>
           </div>
-          ` : `
-          <div class="tx-proof">
-            <strong>⏳ Sepolia Settlement Dispatched!</strong><br/>
-            Target: <span style="font-family:monospace; font-size:0.7rem;">${targetWallet.substring(0, 18)}...</span><br/>
-            <a href="https://sepolia.etherscan.io/address/${targetWallet}" target="_blank" class="tx-link">View Wallet Activity on Sepolia Etherscan ↗</a>
-          </div>
-          `}
         </div>
 
         <p style="font-size: 0.82rem; color: #718096; line-height: 1.4; margin: 0;">
