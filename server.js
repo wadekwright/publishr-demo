@@ -11,15 +11,25 @@ const PORT = process.env.PORT || 3000;
 const TABLELAND_ENDPOINT = "https://testnets.tableland.network/api/v1/query?statement=";
 const TABLE_NAME = "news_notary_11155111_2087";
 
-// Public Sepolia RPC Provider
-const SEPOLIA_RPC_URL = "https://rpc.ankr.com/eth_sepolia";
-const provider = new ethers.JsonRpcProvider(SEPOLIA_RPC_URL);
+// Public RPC Fallback List
+const RPC_URLS = [
+  "https://rpc.ankr.com/eth_sepolia",
+  "https://ethereum-sepolia-rpc.publicnode.com",
+  "https://sepolia.gateway.tenderly.co"
+];
+
+const provider = new ethers.JsonRpcProvider(RPC_URLS[0]);
 
 // Initialize Wallet Signer from Secure Environment Variable
 let walletSigner = null;
 if (process.env.SEPOLIA_PRIVATE_KEY) {
   try {
-    walletSigner = new ethers.Wallet(process.env.SEPOLIA_PRIVATE_KEY, provider);
+    // Sanitize key input
+    let cleanKey = process.env.SEPOLIA_PRIVATE_KEY.trim();
+    if (!cleanKey.startsWith('0x')) {
+      cleanKey = '0x' + cleanKey;
+    }
+    walletSigner = new ethers.Wallet(cleanKey, provider);
     console.log("Sepolia Settlement Signer initialized successfully:", walletSigner.address);
   } catch (err) {
     console.error("Failed to initialize Sepolia Wallet Signer:", err.message);
@@ -61,7 +71,7 @@ async function getTablelandArticles(articleIds) {
 // Helper: Execute 3-Tier Micropayment Split on Sepolia
 async function executeMicropaymentSplit(art) {
   if (!walletSigner) {
-    console.log("No wallet signer available. Skipping on-chain transaction.");
+    console.log("No wallet signer available. SEPOLIA_PRIVATE_KEY missing.");
     return null;
   }
 
@@ -76,20 +86,21 @@ async function executeMicropaymentSplit(art) {
 
     console.log(`Executing 3-Tier Micropayment for Article #${art.article_id}...`);
 
-    // Broadcast primary settlement transaction to generate tx hash
+    // Explicit transaction object with fallback gas limit to avoid RPC estimate failures
     const tx = await walletSigner.sendTransaction({
       to: platformAddr,
-      value: platformAmt
+      value: platformAmt,
+      gasLimit: 210000
     });
 
-    // Fire secondary transfers asynchronously
-    walletSigner.sendTransaction({ to: authorAddr, value: authorAmt }).catch(e => console.error("Author transfer err:", e.message));
-    walletSigner.sendTransaction({ to: feeAddr, value: feeAmt }).catch(e => console.error("Fee transfer err:", e.message));
+    // Fire remaining royalties asynchronously
+    walletSigner.sendTransaction({ to: authorAddr, value: authorAmt, gasLimit: 210000 }).catch(e => console.error("Author transfer err:", e.message));
+    walletSigner.sendTransaction({ to: feeAddr, value: feeAmt, gasLimit: 210000 }).catch(e => console.error("Fee transfer err:", e.message));
 
-    console.log("Sepolia Transaction Submitted! Hash:", tx.hash);
+    console.log("Sepolia Transaction Submitted Successfully! Hash:", tx.hash);
     return tx.hash;
   } catch (err) {
-    console.error("Micropayment Execution Error:", err.message);
+    console.error("Micropayment Execution Error Detail:", err);
     return null;
   }
 }
