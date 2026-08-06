@@ -13,7 +13,6 @@ const TABLE_NAME = "news_notary_11155111_2087";
 
 // Public RPC Fallback List
 const RPC_URLS = [
-  "https://rpc.ankr.com/eth_sepolia",
   "https://ethereum-sepolia-rpc.publicnode.com",
   "https://sepolia.gateway.tenderly.co"
 ];
