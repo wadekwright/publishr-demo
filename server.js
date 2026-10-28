@@ -1,5 +1,6 @@
 const express = require('express');
 const path = require('path');
+const fs = require('fs');
 const PDFDocument = require('pdfkit');
 const QRCode = require('qrcode');
 const { ethers } = require('ethers');
@@ -7,23 +8,17 @@ const { ethers } = require('ethers');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Tableland & Sepolia Config
-const TABLELAND_ENDPOINT = "https://testnets.tableland.network/api/v1/query?statement=";
+// Notary Ledger Config (Local JSON Backup)
 const TABLE_NAME = "news_notary_11155111_2087";
 
-// Public RPC Fallback List
-const RPC_URLS = [
-  "https://ethereum-sepolia-rpc.publicnode.com",
-  "https://sepolia.gateway.tenderly.co"
-];
-
-const provider = new ethers.JsonRpcProvider(RPC_URLS[0]);
+// Public Sepolia RPC Provider
+const SEPOLIA_RPC_URL = "https://ethereum-sepolia-rpc.publicnode.com";
+const provider = new ethers.JsonRpcProvider(SEPOLIA_RPC_URL);
 
 // Initialize Wallet Signer from Secure Environment Variable
 let walletSigner = null;
 if (process.env.SEPOLIA_PRIVATE_KEY) {
   try {
-    // Sanitize key input
     let cleanKey = process.env.SEPOLIA_PRIVATE_KEY.trim();
     if (!cleanKey.startsWith('0x')) {
       cleanKey = '0x' + cleanKey;
@@ -59,12 +54,20 @@ function stripHTML(html) {
     .trim();
 }
 
-// Helper: Fetch article rows from Tableland
+// Helper: Fetch article rows from Local JSON Ledger
 async function getTablelandArticles(articleIds) {
-  const query = encodeURIComponent(`SELECT * FROM ${TABLE_NAME} WHERE article_id IN (${articleIds.join(',')});`);
-  const response = await fetch(TABLELAND_ENDPOINT + query);
-  const data = await response.json();
-  return data;
+  try {
+    const filePath = path.join(__dirname, 'articles.json');
+    const rawData = fs.readFileSync(filePath, 'utf8');
+    const allArticles = JSON.parse(rawData);
+    
+    // Filter matching articles by ID
+    const matched = allArticles.filter(art => articleIds.includes(art.article_id));
+    return matched;
+  } catch (err) {
+    console.error("Error reading local article ledger:", err.message);
+    return [];
+  }
 }
 
 // Helper: Execute 3-Tier Micropayment Split on Sepolia
@@ -85,21 +88,19 @@ async function executeMicropaymentSplit(art) {
 
     console.log(`Executing 3-Tier Micropayment for Article #${art.article_id}...`);
 
-    // Explicit transaction object with fallback gas limit to avoid RPC estimate failures
     const tx = await walletSigner.sendTransaction({
       to: platformAddr,
       value: platformAmt,
       gasLimit: 210000
     });
 
-    // Fire remaining royalties asynchronously
     walletSigner.sendTransaction({ to: authorAddr, value: authorAmt, gasLimit: 210000 }).catch(e => console.error("Author transfer err:", e.message));
     walletSigner.sendTransaction({ to: feeAddr, value: feeAmt, gasLimit: 210000 }).catch(e => console.error("Fee transfer err:", e.message));
 
     console.log("Sepolia Transaction Submitted Successfully! Hash:", tx.hash);
     return tx.hash;
   } catch (err) {
-    console.error("Micropayment Execution Error Detail:", err);
+    console.error("Micropayment Execution Error Detail:", err.message);
     return null;
   }
 }
@@ -117,7 +118,7 @@ app.get('/api/generate-pdf', async (req, res) => {
 
     const articles = await getTablelandArticles(ids);
     if (!articles || articles.length === 0) {
-      return res.status(404).send("Articles not found on Tableland ledger.");
+      return res.status(404).send("Articles not found on notary ledger.");
     }
 
     const hostDomain = req.get('host');
@@ -194,19 +195,16 @@ app.get('/api/generate-pdf', async (req, res) => {
       // QR Block Header Text
       doc.fillColor('#1a365d').fontSize(7.5).font('Helvetica-Bold').text('SCAN THE QR CODE TO:', textX, qrRowY + 1);
 
-      // Bullet Point 1
+      // Bullet Points
       doc.fillColor('#2d3748').fontSize(6.5).font('Helvetica-Bold').text('- Verify ', textX, qrRowY + 11, { continued: true })
          .font('Helvetica').text('article authenticity on the blockchain', { width: textWidth });
 
-      // Bullet Point 2
       doc.fillColor('#2d3748').fontSize(6.5).font('Helvetica-Bold').text('- Action ', textX, qrRowY + 20, { continued: true })
          .font('Helvetica').text('micropayments to source, author, Publishr', { width: textWidth });
 
-      // Bullet Point 3
       doc.fillColor('#2d3748').fontSize(6.5).font('Helvetica-Bold').text('- Measure ', textX, qrRowY + 29, { continued: true })
          .font('Helvetica').text('reader traffic and interest from print', { width: textWidth });
 
-      // Bullet Point 4
       doc.fillColor('#2d3748').fontSize(6.5).font('Helvetica-Bold').text('- Read ', textX, qrRowY + 38, { continued: true })
          .font('Helvetica').text('the full article on the source platform', { width: textWidth });
 
@@ -235,7 +233,7 @@ app.get('/verify', async (req, res) => {
     if (!articleId || isNaN(articleId)) return res.status(400).send("Missing or Invalid Article ID.");
 
     const articles = await getTablelandArticles([articleId]);
-    if (!articles || articles.length === 0) return res.status(404).send("Article not found on Tableland.");
+    if (!articles || articles.length === 0) return res.status(404).send("Article not found on notary ledger.");
 
     const art = articles[0];
 
@@ -324,7 +322,7 @@ app.get('/verify', async (req, res) => {
           ` : `
           <div class="tx-proof" style="background:#fffaf0; border-color:#feebc8; color:#744210;">
             ⏳ Settlement queued on Sepolia Testnet.<br/>
-            <a href="https://sepolia.etherscan.io/address/0x460cd5eD554a99187310d54025178B8bA8e3B43E" target="_blank" class="tx-link">View Disburser Activity on Etherscan ↗</a>
+            <a href="https://sepolia.etherscan.io/address/0x460cd6a3ea967c4FBD4a93cd18C602a87d49298b" target="_blank" class="tx-link">View Disburser Activity on Etherscan ↗</a>
           </div>
           `}
         </div>
