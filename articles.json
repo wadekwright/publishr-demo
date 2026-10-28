@@ -1,0 +1,46 @@
+[
+  {
+    "article_id": 1,
+    "source_platform": "BBC News",
+    "title": "China's Moonshot AI claims Kimi K3 can rival OpenAI and Anthropic",
+    "author": "Francisco Velasquez",
+    "body_text": "Moonshot AI has unveiled its next-generation Kimi K3 model, asserting that its internal benchmarks demonstrate reasoning capabilities on par with top-tier Western artificial intelligence labs. The announcement highlights rapidly escalating global competition in foundational multimodal intelligence.",
+    "destination_url": "https://www.bbc.com/news",
+    "platform_wallet": "0x993210C351B4232B25Ece5B2C50A1EE5D1791bED",
+    "author_wallet": "0xcAB90A175BfA93EaC4b34A600A6b8D3396590d95",
+    "platform_fee_wallet": "0xa662aA39b3Ac8C6EE346f0494a82CA31818B1532"
+  },
+  {
+    "article_id": 2,
+    "source_platform": "TechCrunch",
+    "title": "Autonomous AI Agents drive demand for localized micro-settlement rails",
+    "author": "Sarah Perez",
+    "body_text": "As autonomous software agents begin executing micro-transactions for data access and media syndication, legacy payment gateways are facing structural friction. Decentralized settlement layers are stepping in to provide low-cost, verifiable attribution.",
+    "destination_url": "https://techcrunch.com",
+    "platform_wallet": "0x993210C351B4232B25Ece5B2C50A1EE5D1791bED",
+    "author_wallet": "0xcAB90A175BfA93EaC4b34A600A6b8D3396590d95",
+    "platform_fee_wallet": "0xa662aA39b3Ac8C6EE346f0494a82CA31818B1532"
+  },
+  {
+    "article_id": 3,
+    "source_platform": "Reuters",
+    "title": "Indo-Pacific trade networks explore blockchain attribution for print media",
+    "author": "David Morgan",
+    "body_text": "Regional publishing networks across Southeast Asia are piloting hybrid print-and-digital measurement frameworks. By embedding cryptographic notary hashes directly onto physical newsprint, publishers are bridging offline readership with verifiable digital engagement metrics.",
+    "destination_url": "https://www.reuters.com",
+    "platform_wallet": "0x993210C351B4232B25Ece5B2C50A1EE5D1791bED",
+    "author_wallet": "0xcAB90A175BfA93EaC4b34A600A6b8D3396590d95",
+    "platform_fee_wallet": "0xa662aA39b3Ac8C6EE346f0494a82CA31818B1532"
+  },
+  {
+    "article_id": 4,
+    "source_platform": "Wired",
+    "title": "Why physical print is becoming the ultimate trust layer in an AI-generated web",
+    "author": "Kevin Kelly",
+    "body_text": "In an internet increasingly saturated with synthetic media and automated content farms, physical paper and verifiable print distribution offer an unalterable anchor of trust for high-value reporting and investigative journalism.",
+    "destination_url": "https://www.wired.com",
+    "platform_wallet": "0x993210C351B4232B25Ece5B2C50A1EE5D1791bED",
+    "author_wallet": "0xcAB90A175BfA93EaC4b34A600A6b8D3396590d95",
+    "platform_fee_wallet": "0xa662aA39b3Ac8C6EE346f0494a82CA31818B1532"
+  }
+]
